@@ -38,4 +38,4 @@ while [[ "$(jobs)" =~ "Running" ]]; do
 done
 echo "Done uploading files"
 #Delete the files after
-[ -f /tmp/SoroushUploader/.nodelete ] && rm -rf /tmp/SoroushUploader
+[ ! -f /tmp/SoroushUploader/.nodelete ] && rm -rf /tmp/SoroushUploader
