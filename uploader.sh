@@ -19,7 +19,7 @@ upload() {
 	echo "https://bot.sapp.ir/$TOKEN/downloadFile/$id" >>"uploaded_files.txt"
 	local fname
 	fname=$(basename "$1")
-	echo "$id:$fname" >>"file_names.txt"
+	echo "bot.sapp.ir/$TOKEN/downloadFile/$id:$fname" >>"file_names.txt"
 }
 #Lets start
 rm -rf /tmp/SoroushUploader
