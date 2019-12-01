@@ -2,6 +2,11 @@
 #EDIT TOKEN:
 TOKEN="YOUR_TOKEN"
 #ALSO MAKE SURE THAT CURL, RAR and JQ ARE INSTALLED ON YOUR SYSTEM
+#Check arguments
+if [[ "$#" -lt 1 ]]; then
+    echo "Please pass file names as argument."
+    exit 1
+fi
 #Remove old files if left and create new one
 rm -rf /tmp/GapUploader
 mkdir /tmp/GapUploader

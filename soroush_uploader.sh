@@ -1,6 +1,10 @@
 #!/bin/bash
 #EDIT TOKEN:
 TOKEN="YOUR_TOKEN"
+if [[ "$#" -lt 1 ]]; then #Check number of arguemnt
+    echo "Please pass file names as argument."
+    exit 1
+fi
 FILE_NAME="$1"
 #ALSO MAKE SURE THAT CURL, RAR and JQ ARE INSTALLED ON YOUR SYSTEM
 upload() {
