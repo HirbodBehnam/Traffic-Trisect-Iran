@@ -22,7 +22,7 @@ eval "$rarCommand"
 delete=true
 for filename in /tmp/GapUploader/*.rar; do
     echo "$(tput setaf 2)Uploading file: $filename $(tput sgr 0)"
-	res=$(curl -X POST -H "content-type: multipart/form-data" -H "token: $TOKEN" -F file=@"$filename" --write-out "\n%{http_code}" https://api.gap.im/upload)
+    res=$(curl -X POST -H "content-type: multipart/form-data" -H "token: $TOKEN" -F file=@"$filename" --write-out "\n%{http_code}" https://api.gap.im/upload)
     readarray -t ary <<<"$res"
     if [[ ${ary[1]} != 200 ]]; then
         echo "$(tput setaf 1)Error on uploading file $filename : ${ary[1]} $(tput sgr 0)"
