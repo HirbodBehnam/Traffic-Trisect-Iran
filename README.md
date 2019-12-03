@@ -10,8 +10,8 @@ In this guide we will use a server to upload data on their servers and then down
 
 **So before you begin, make sure that you have a server.**
 ### Guide
-You can download the guide from [here](http://www.mediafire.com/folder/b3f2t3rgshm1l/Traffic_Trisect_Iran)
+You can download the guide from [here](http://rizy.ir/onethirdprice)
 ### Half Internet Prices
 If you have trouble uploading your files on messenger servers (I know they are all bullshit), you can use this guild that will half the price of your internet via upload sites.
 
-[Link to guide](http://www.mediafire.com/file/df4ogdgld3e6mfj/%25D9%2586%25DB%258C%25D9%2585_%25D8%25A8%25D9%2587%25D8%25A7_%25DA%25A9%25D8%25B1%25D8%25AF%25D9%2586_%25D8%25AF%25D8%25A7%25D9%2586%25D9%2584%25D9%2588%25D8%25AF_%25D9%2587%25D8%25A7%25DB%258C_%25D8%25AE%25D9%2588%25D8%25AF.pdf/file)
+[Link to Guide](http://rizy.ir/halfprice)
