@@ -311,7 +311,12 @@ func main() {
 							}
 							progressbar += "]"
 
-							edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Uploading:\n"+humanize.Bytes(uint64(uploaded))+" from "+humanize.Bytes(uint64(downloadSize))+"\n"+progressbar+"\nSpeed: "+humanize.Bytes(uint64(writtenInSecond))+"/s")
+							text := "Uploading:\n" + humanize.Bytes(uint64(uploaded)) + " from " + humanize.Bytes(uint64(downloadSize)) + "\n" + progressbar + "\nSpeed: " + humanize.Bytes(uint64(writtenInSecond)) + "/s"
+							if uploaded == downloadSize {
+								text += "\n\nFinishing upload might take a while, if you get an 405 error, try at another time."
+							}
+
+							edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, text)
 							writtenInSecond = 0
 							edited.ReplyMarkup = &inlineKeyboard
 							_, _ = bot.Send(edited)
