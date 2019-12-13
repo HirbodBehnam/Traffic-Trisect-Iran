@@ -23,7 +23,7 @@ upload() {
 	fname=$(basename "$1")
 	echo "bot.sapp.ir/$TOKEN/downloadFile/$id:$fname" >>"file_names.txt"
 	echo "IDMan.exe /d https://bot.sapp.ir/$TOKEN/downloadFile/$id /f $fname /a" >> idm.bat
-	rm "$fname"
+	rm "$1"
 }
 #Lets start
 rm -rf /tmp/SoroushUploader
