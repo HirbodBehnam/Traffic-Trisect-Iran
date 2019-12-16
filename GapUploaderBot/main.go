@@ -27,7 +27,7 @@ type ConfigJson struct {
 
 var Config ConfigJson
 var Downloads = make(map[int]bool) //True is downloading, false is canceled
-const VERSION = "1.0.0 / Build 1"
+const VERSION = "1.0.1 / Build 2"
 
 func main() {
 
@@ -172,12 +172,11 @@ func main() {
 								progressbar := "["
 								tempPercent := math.Floor(percent / 10)
 								for i := 0; i < int(tempPercent); i++ {
-									progressbar += "#"
+									progressbar += "█" // https://www.compart.com/en/unicode/U+2588
 								}
-								progressbar += ">"
-								tempPercent = 9 - tempPercent
+								tempPercent = 10 - tempPercent
 								for i := 0; i < int(tempPercent); i++ {
-									progressbar += "⠀" // This is not space! https://www.compart.com/en/unicode/U+2800
+									progressbar += "▁" // https://www.compart.com/en/unicode/U+2581
 								}
 								progressbar += "]"
 
@@ -302,12 +301,11 @@ func main() {
 							progressbar := "["
 							tempPercent := math.Floor(percent / 10)
 							for i := 0; i < int(tempPercent); i++ {
-								progressbar += "#"
+								progressbar += "█" // https://www.compart.com/en/unicode/U+2588
 							}
-							progressbar += ">"
-							tempPercent = 9 - tempPercent
+							tempPercent = 10 - tempPercent
 							for i := 0; i < int(tempPercent); i++ {
-								progressbar += "⠀" // This is not space! https://www.compart.com/en/unicode/U+2800
+								progressbar += "▁" // https://www.compart.com/en/unicode/U+2581
 							}
 							progressbar += "]"
 
