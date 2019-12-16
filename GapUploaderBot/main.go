@@ -163,13 +163,9 @@ func main() {
 							case <-done:
 								return
 							default:
-								if err != nil {
-									log.Fatal(err)
-								}
-
 								fi, err := file.Stat()
 								if err != nil {
-									log.Fatal(err)
+									return
 								}
 
 								size := fi.Size()
