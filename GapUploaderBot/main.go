@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/dustin/go-humanize"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	cmap "github.com/orcaman/concurrent-map"
 	"io"
 	"io/ioutil"
 	"log"
@@ -15,6 +16,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -24,13 +26,17 @@ type ConfigJson struct {
 	Admins        []int
 	MaxFileSize   int
 }
+type messageCounter struct {
+	Counter uint32
+	mutex   sync.Mutex
+}
 
 var Config ConfigJson
-var Downloads = make(map[int]bool) //True is downloading, false is canceled
-const VERSION = "1.0.1 / Build 2"
+var Downloads cmap.ConcurrentMap      //True is downloading, false is canceled
+var MessageCounter = messageCounter{} //We use this value for Downloads map
+const VERSION = "1.0.2 / Build 3"
 
 func main() {
-
 	{ //Parse argument
 		cnf := "config.json"
 		if len(os.Args) > 1 {
@@ -57,16 +63,18 @@ func main() {
 	log.Printf("Bot authorized on account %s", bot.Self.UserName)
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
-	updates, err := bot.GetUpdatesChan(u)
+	updates, _ := bot.GetUpdatesChan(u)
+
+	Downloads = cmap.New()
 
 	for update := range updates {
 		if update.Message == nil && update.CallbackQuery == nil {
 			continue
 		}
 		//Check query on cancel points
-		if update.CallbackQuery != nil && update.CallbackQuery.Data == "Cancel" {
-			if _, ok := Downloads[update.CallbackQuery.Message.MessageID]; ok {
-				Downloads[update.CallbackQuery.Message.MessageID] = false
+		if update.CallbackQuery != nil {
+			if _, ok := Downloads.Get(update.CallbackQuery.Data); ok {
+				Downloads.Set(update.CallbackQuery.Data, false)
 			}
 			continue
 		}
@@ -92,9 +100,7 @@ func main() {
 			go func(lUpdate tgbotapi.Update) {
 				//At first send a message to user
 				msg := tgbotapi.NewMessage(lUpdate.Message.Chat.ID, "Getting info about the file...")
-				inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Cancel", "Cancel")))
 				msg.ReplyToMessageID = lUpdate.Message.MessageID
-				msg.ReplyMarkup = inlineKeyboard
 				SentMessage, err := bot.Send(msg)
 				if err != nil {
 					log.Println("Error sending message:", err)
@@ -141,7 +147,12 @@ func main() {
 					return
 				}
 
-				Downloads[SentMessage.MessageID] = true
+				MessageCounter.mutex.Lock()
+				MessageCounter.Counter++
+				msgCount := strconv.FormatUint(uint64(MessageCounter.Counter), 10)
+				MessageCounter.mutex.Unlock()
+				inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Cancel", msgCount)))
+				Downloads.Set(msgCount, true)
 				writtenInSecond := 0
 				done := make(chan int64)
 				{
@@ -192,11 +203,11 @@ func main() {
 						//This part is mostly like io.copy
 						buf := make([]byte, 32768)
 						for {
-							if !Downloads[SentMessage.MessageID] {
+							if downloading, _ := Downloads.Get(msgCount); !downloading.(bool) {
 								done <- 0 //Terminate download statics
 								edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Canceled")
 								_, _ = bot.Send(edited)
-								delete(Downloads, SentMessage.MessageID)
+								Downloads.Remove(msgCount)
 								return
 							}
 							nr, er := resp.Body.Read(buf)
@@ -254,11 +265,11 @@ func main() {
 
 					buf := make([]byte, 32768)
 					for {
-						if !Downloads[SentMessage.MessageID] {
-							done <- 0
+						if downloading, _ := Downloads.Get(msgCount); !downloading.(bool) {
+							done <- 0 //Terminate download statics
 							edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Canceled")
 							_, _ = bot.Send(edited)
-							delete(Downloads, SentMessage.MessageID)
+							Downloads.Remove(msgCount)
 							return
 						}
 						nr, er := file1.Read(buf)
@@ -335,7 +346,7 @@ func main() {
 				// Submit the request
 				var client = &http.Client{}
 				resp, err = client.Do(req)
-				if !Downloads[SentMessage.MessageID] { //Check if the process has been terminated by user
+				if _, exist := Downloads.Get(msgCount); !exist { //Check if the process has been terminated by user
 					return
 				}
 				done <- 0 //Terminate the status reporter if it wasn't canceled
