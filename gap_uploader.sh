@@ -11,7 +11,7 @@ fi
 rm -rf /tmp/GapUploader
 mkdir /tmp/GapUploader
 #Generate the rar command
-rarCommand="rar a -M0 -v400M /tmp/GapUploader/upload.rar" #You can change this command
+rarCommand="rar a -M0 -v500M /tmp/GapUploader/upload.rar" #You can change this command
 for arg in "$@"
 do
     rarCommand+=" \"$arg\""
