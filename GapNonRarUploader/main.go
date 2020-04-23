@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 )
 
 const TOKEN = "" // FILL THIS
@@ -82,6 +83,15 @@ func Upload() {
 	}
 
 	partNumber := 0
+	totalReadBytes := 0
+	// report progress
+	go func() {
+		size, _ := f.Stat()
+		for {
+			fmt.Print("\r" + fmt.Sprintf("%.2f", float32(totalReadBytes)/float32(size.Size())*100) + "%")
+			time.Sleep(time.Second)
+		}
+	}()
 	for doneUploading := false; !doneUploading; {
 		partNumber++
 		r, w := io.Pipe()           // Use pipe to reduce ram usage, and read and write simultaneously
@@ -107,6 +117,7 @@ func Upload() {
 					}
 					log.Fatal("Cannot read file:", rError.Error())
 				}
+				totalReadBytes += count
 				_, wError := part.Write(buffer[:count])
 				if wError != nil {
 					break
@@ -148,6 +159,7 @@ func Upload() {
 		if finalLink, ok := jsonRes["path"]; ok {
 			_, err = linksFile.WriteString(finalLink.(string) + "\n")
 			if err != nil {
+				fmt.Println()
 				fmt.Println("Cannot write link to file. Here is the link:")
 				fmt.Println(finalLink.(string))
 			}
