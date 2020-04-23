@@ -16,7 +16,7 @@ import (
 
 const TOKEN = "" // FILL THIS
 const ReadBuffer = 32 * 1024
-const NumberOfParts = 100 * 1000 / ReadBuffer // We read the file 32kb at once. Max file size is 500MB. This is the max number of parts for each file
+const NumberOfParts = 500 * 1000 * 1000 / ReadBuffer // We read the file 32kb at once. Max file size is 500MB. This is the max number of parts for each file
 
 var FileName string
 
