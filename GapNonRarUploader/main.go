@@ -72,6 +72,10 @@ func Merge() {
 }
 
 func Upload() {
+	linksFile, err := os.Create(FileName + ".txt")
+	if err != nil {
+		log.Fatal("Cannot create link files:", err.Error())
+	}
 	f, err := os.Open(FileName)
 	if err != nil {
 		log.Fatal("Cannot read file:", err.Error())
@@ -142,7 +146,11 @@ func Upload() {
 			log.Fatal("Cannot deserialize the web page json:", err.Error())
 		}
 		if finalLink, ok := jsonRes["path"]; ok {
-			fmt.Println(finalLink.(string))
+			_, err = linksFile.WriteString(finalLink.(string) + "\n")
+			if err != nil {
+				fmt.Println("Cannot write link to file. Here is the link:")
+				fmt.Println(finalLink.(string))
+			}
 		} else {
 			log.Fatal("Cannot deserialize the web page json: Cannot find `path` in the json. Json is:\n" + string(readBuf))
 		}
