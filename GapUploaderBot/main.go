@@ -107,7 +107,7 @@ func main() {
 					return
 				}
 				//Get the file length
-				resp, err := http.Head(lUpdate.Message.Text)
+				resp, err := http.Get(lUpdate.Message.Text)
 				if err != nil {
 					edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Error on getting file size: "+err.Error())
 					_, _ = bot.Send(edited)
@@ -139,13 +139,6 @@ func main() {
 				}
 				defer file.Close()
 				defer os.Remove(file.Name())
-
-				resp, err = http.Get(lUpdate.Message.Text)
-				if err != nil {
-					edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Error on downloading file: "+err.Error())
-					_, _ = bot.Send(edited)
-					return
-				}
 
 				MessageCounter.mutex.Lock()
 				MessageCounter.Counter++
