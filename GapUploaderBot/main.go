@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -129,24 +130,20 @@ func main() {
 					_, _ = bot.Send(edited)
 					return
 				}
-				//Now download the file
-				file, err := ioutil.TempFile("", "*.tmp") //Create a temp file, it will be renamed later
-				if err != nil {
-					edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Error on creating a temp file: "+err.Error())
-					_, _ = bot.Send(edited)
-					log.Println("Error on creating a temp file:", err.Error())
-					return
-				}
-				defer file.Close()
-				defer os.Remove(file.Name())
 
+				// create the id for cancel button
 				MessageCounter.mutex.Lock()
 				MessageCounter.Counter++
 				msgCount := strconv.FormatUint(uint64(MessageCounter.Counter), 10)
 				MessageCounter.mutex.Unlock()
+
 				inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Cancel", msgCount)))
 				Downloads.Set(msgCount, true)
 				writtenInSecond := 0
+				downloaded := 0
+
+				r, w := io.Pipe()   //Use pipe to reduce ram usage
+				m := multipart.NewWriter(w)
 				done := make(chan int64)
 				{
 					go func() { //Report download
@@ -156,18 +153,7 @@ func main() {
 							case <-done:
 								return
 							default:
-								fi, err := file.Stat()
-								if err != nil {
-									return
-								}
-
-								size := fi.Size()
-
-								if size == 0 {
-									size = 1
-								}
-
-								percent = float64(size) / float64(downloadSize) * 100
+								percent = float64(downloaded) / float64(downloadSize) * 100
 
 								progressbar := "["
 								tempPercent := math.Floor(percent / 10)
@@ -180,7 +166,12 @@ func main() {
 								}
 								progressbar += "]"
 
-								edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Downloading:\n"+humanize.Bytes(uint64(size))+" from "+humanize.Bytes(uint64(downloadSize))+"\n"+progressbar+"\nSpeed: "+humanize.Bytes(uint64(writtenInSecond))+"/s")
+								text := "Downloading and Uploading:\n"+humanize.Bytes(uint64(downloaded))+" from "+humanize.Bytes(uint64(downloadSize))+"\n"+progressbar+"\nSpeed: "+humanize.Bytes(uint64(writtenInSecond))+"/s"
+								if downloaded == downloadSize {
+									text += "\n\nFinishing upload might take a while, if you get an 405 error, try at another time."
+								}
+
+								edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, text)
 								writtenInSecond = 0
 								edited.ReplyMarkup = &inlineKeyboard
 								_, _ = bot.Send(edited)
@@ -188,7 +179,25 @@ func main() {
 							time.Sleep(time.Second)
 						}
 					}()
-					{
+					go func(){
+						defer resp.Body.Close()
+						defer w.Close()
+						defer m.Close()
+
+						// Get filename
+						FileName := ""
+						if fn := resp.Header.Get("Content-Disposition"); fn != ""{
+							fmt.Println(fn)
+							_, params, err := mime.ParseMediaType(fn)
+							if err == nil {
+								FileName = params["filename"]
+							}
+						}
+						if FileName == ""{
+							FileName = getFileName(lUpdate.Message.Text)
+						}
+
+						part, _ := m.CreateFormFile("file", FileName)
 						//This part is mostly like io.copy
 						buf := make([]byte, 32768)
 						for {
@@ -201,8 +210,9 @@ func main() {
 							}
 							nr, er := resp.Body.Read(buf)
 							if nr > 0 {
-								nw, ew := file.Write(buf[0:nr])
+								nw, ew := part.Write(buf[0:nr]) // directly upload to gap
 								if nw > 0 {
+									downloaded+= nw
 									writtenInSecond += nw
 								}
 								if ew != nil {
@@ -221,107 +231,11 @@ func main() {
 								break
 							}
 						}
-					}
-					done <- 0 //Terminate download statics
-					if err != nil {
-						edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Error on downloading file: "+err.Error())
-						_, _ = bot.Send(edited)
-						return
-					}
+
+					}()
 				}
-				edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Done downloading the file.\nPreparing to upload the file...")
-				edited.ReplyMarkup = &inlineKeyboard
-				_, _ = bot.Send(edited)
-				//Now upload the file
-				uploaded := 0       //Track uploaded bytes to report process
-				writtenInSecond = 0 //Also track the upload speed
-				r, w := io.Pipe()   //Use pipe to reduce ram usage
-				m := multipart.NewWriter(w)
-				go func() { //Write to pipe https://medium.com/@owlwalks/sending-big-file-with-minimal-memory-in-golang-8f3fc280d2c
-					defer w.Close()
-					defer m.Close()
-					part, err := m.CreateFormFile("file", getFileName(lUpdate.Message.Text))
-					if err != nil {
-						return
-					}
 
-					//IDK why but I cannot use file.Read :|
-					file1, err := os.Open(file.Name())
-					if err != nil {
-						return
-					}
-					defer file1.Close()
-
-					buf := make([]byte, 32768)
-					for {
-						if downloading, _ := Downloads.Get(msgCount); !downloading.(bool) {
-							done <- 0 //Terminate download statics
-							edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Canceled")
-							_, _ = bot.Send(edited)
-							Downloads.Remove(msgCount)
-							return
-						}
-						nr, er := file1.Read(buf)
-						if nr > 0 {
-							nw, ew := part.Write(buf[0:nr])
-							if nw > 0 {
-								uploaded += nw
-								writtenInSecond += nw
-							}
-							if ew != nil {
-								err = ew
-								break
-							}
-							if nr != nw {
-								err = io.ErrShortWrite
-								break
-							}
-						}
-						if er != nil {
-							if er != io.EOF {
-								err = er
-							}
-							break
-						}
-					}
-					if err != nil {
-						fmt.Println(err)
-					}
-				}()
-
-				go func() { //Report process
-					var percent float64
-					for {
-						select {
-						case <-done:
-							return
-						default:
-							percent = float64(uploaded) / float64(downloadSize) * 100
-
-							progressbar := "["
-							tempPercent := math.Floor(percent / 10)
-							for i := 0; i < int(tempPercent); i++ {
-								progressbar += "█" // https://www.compart.com/en/unicode/U+2588
-							}
-							tempPercent = 10 - tempPercent
-							for i := 0; i < int(tempPercent); i++ {
-								progressbar += "▁" // https://www.compart.com/en/unicode/U+2581
-							}
-							progressbar += "]"
-
-							text := "Uploading:\n" + humanize.Bytes(uint64(uploaded)) + " from " + humanize.Bytes(uint64(downloadSize)) + "\n" + progressbar + "\nSpeed: " + humanize.Bytes(uint64(writtenInSecond)) + "/s"
-							if uploaded == downloadSize {
-								text += "\n\nFinishing upload might take a while, if you get an 405 error, try at another time."
-							}
-
-							edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, text)
-							writtenInSecond = 0
-							edited.ReplyMarkup = &inlineKeyboard
-							_, _ = bot.Send(edited)
-						}
-						time.Sleep(time.Second)
-					}
-				}()
+				// create the upload request
 				req, err := http.NewRequest("POST", "https://api.gap.im/upload", r)
 				if err != nil {
 					edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Error on initializing upload (request): "+err.Error())
@@ -333,8 +247,8 @@ func main() {
 				req.Header.Add("token", Config.GapToken)
 
 				// Submit the request
-				var client = &http.Client{}
-				resp, err = client.Do(req)
+				client := &http.Client{}
+				resp2, err := client.Do(req)
 				if _, exist := Downloads.Get(msgCount); !exist { //Check if the process has been terminated by user
 					return
 				}
@@ -344,19 +258,19 @@ func main() {
 					_, _ = bot.Send(edited)
 					return
 				}
-				if resp.StatusCode != http.StatusOK { //In Gap 403 means invalid token; 500 invalid file type or big file. 405 means that their server is fucked
+				if resp2.StatusCode != http.StatusOK { //In Gap 403 means invalid token; 500 invalid file type or big file. 405 means that their server is fucked
 					edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Error on uploading file: The web page returned status code "+strconv.FormatInt(int64(resp.StatusCode), 10))
 					_, _ = bot.Send(edited)
 					return
 				}
 				body := &bytes.Buffer{}
-				_, err = body.ReadFrom(resp.Body)
+				_, err = body.ReadFrom(resp2.Body)
 				if err != nil {
 					edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Cannot read page body: "+err.Error())
 					_, _ = bot.Send(edited)
 					return
 				}
-				_ = resp.Body.Close()
+				_ = resp2.Body.Close()
 				//Try to deserialize json
 				readBuf, err := ioutil.ReadAll(body)
 				if err != nil {
