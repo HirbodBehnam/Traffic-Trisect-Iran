@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/dustin/go-humanize"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	cmap "github.com/orcaman/concurrent-map"
@@ -14,6 +13,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"strconv"
@@ -35,7 +35,7 @@ type messageCounter struct {
 var Config ConfigJson
 var Downloads cmap.ConcurrentMap      //True is downloading, false is canceled
 var MessageCounter = messageCounter{} //We use this value for Downloads map
-const VERSION = "1.0.2 / Build 3"
+const VERSION = "1.1.1 / Build 5"
 
 func main() {
 	{ //Parse argument
@@ -142,7 +142,7 @@ func main() {
 				writtenInSecond := 0
 				downloaded := 0
 
-				r, w := io.Pipe()   //Use pipe to reduce ram usage
+				r, w := io.Pipe() //Use pipe to reduce ram usage
 				m := multipart.NewWriter(w)
 				done := make(chan int64)
 				{
@@ -166,7 +166,7 @@ func main() {
 								}
 								progressbar += "]"
 
-								text := "Downloading and Uploading:\n"+humanize.Bytes(uint64(downloaded))+" from "+humanize.Bytes(uint64(downloadSize))+"\n"+progressbar+"\nSpeed: "+humanize.Bytes(uint64(writtenInSecond))+"/s"
+								text := "Downloading and Uploading:\n" + humanize.Bytes(uint64(downloaded)) + " from " + humanize.Bytes(uint64(downloadSize)) + "\n" + progressbar + "\nSpeed: " + humanize.Bytes(uint64(writtenInSecond)) + "/s"
 								if downloaded == downloadSize {
 									text += "\n\nFinishing upload might take a while, if you get an 405 error, try at another time."
 								}
@@ -179,21 +179,24 @@ func main() {
 							time.Sleep(time.Second)
 						}
 					}()
-					go func(){
+					go func() {
 						defer resp.Body.Close()
 						defer w.Close()
 						defer m.Close()
 
 						// Get filename
 						FileName := ""
-						if fn := resp.Header.Get("Content-Disposition"); fn != ""{
-							fmt.Println(fn)
+						if fn := resp.Header.Get("Content-Disposition"); fn != "" {
 							_, params, err := mime.ParseMediaType(fn)
 							if err == nil {
 								FileName = params["filename"]
+								escaped, err := url.QueryUnescape(FileName)
+								if err == nil {
+									FileName = escaped
+								}
 							}
 						}
-						if FileName == ""{
+						if FileName == "" {
 							FileName = getFileName(lUpdate.Message.Text)
 						}
 
@@ -212,7 +215,7 @@ func main() {
 							if nr > 0 {
 								nw, ew := part.Write(buf[0:nr]) // directly upload to gap
 								if nw > 0 {
-									downloaded+= nw
+									downloaded += nw
 									writtenInSecond += nw
 								}
 								if ew != nil {
