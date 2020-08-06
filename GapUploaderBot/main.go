@@ -35,7 +35,7 @@ type messageCounter struct {
 var Config ConfigJson
 var Downloads cmap.ConcurrentMap      //True is downloading, false is canceled
 var MessageCounter = messageCounter{} //We use this value for Downloads map
-const VERSION = "1.1.1 / Build 5"
+const VERSION = "1.1.1 / Build 6"
 
 func main() {
 	{ //Parse argument
@@ -262,7 +262,7 @@ func main() {
 					return
 				}
 				if resp2.StatusCode != http.StatusOK { //In Gap 403 means invalid token; 500 invalid file type or big file. 405 means that their server is fucked
-					edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Error on uploading file: The web page returned status code "+strconv.FormatInt(int64(resp.StatusCode), 10))
+					edited := tgbotapi.NewEditMessageText(lUpdate.Message.Chat.ID, SentMessage.MessageID, "Error on uploading file: The web page returned status code "+strconv.FormatInt(int64(resp2.StatusCode), 10))
 					_, _ = bot.Send(edited)
 					return
 				}
