@@ -292,6 +292,7 @@ func main() {
 					//Finally send the link
 					rmMsg := tgbotapi.NewDeleteMessage(lUpdate.Message.Chat.ID, SentMessage.MessageID)
 					msg := tgbotapi.NewMessage(lUpdate.Message.Chat.ID, finalLink)
+					msg.DisableWebPagePreview = true
 					msg.ReplyToMessageID = lUpdate.Message.MessageID
 					_, _ = bot.Send(msg)
 					_, _ = bot.Send(rmMsg)
