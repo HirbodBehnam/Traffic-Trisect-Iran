@@ -31,7 +31,7 @@ eval "$rarCommand"
 for filename in /tmp/XFSUploader/*.rar; do
     echo "$(tput setaf 2)Uploading file: $filename $(tput sgr 0)"
     res=$(curl -F file=@"$filename" -F sess_id="$XFSS" -F utype=reg -b xfss="$XFSS" "http://s6.uplod.ir/cgi-bin/upload.cgi?upload_type=file&utype=reg") # You can change the url. Use inspect element on main form of upload to find the url
-    result=$(jq -r .[0]file_status <<<"$res")
+    result=$(jq -r .[0].file_status <<<"$res")
     if [[ $result != "OK" ]] ; then
         echo "$(tput setaf 1)Error on uploading file $filename : $res $(tput sgr 0)"
         continue
