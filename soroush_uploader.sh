@@ -1,8 +1,8 @@
 #!/bin/bash
 #EDIT TOKEN:
 TOKEN="YOUR_TOKEN"
-if [[ "$#" -lt 1 ]]; then #Check number of arguemnt
-	echo "Please pass file names as argument."
+if [[ "$#" -lt 2 ]]; then #Check number of arguemnt
+	echo "Please pass the upload rar name as first argument and file names you want to upload as next arguments."
 	exit 1
 fi
 #ALSO MAKE SURE THAT CURL, RAR and JQ ARE INSTALLED ON YOUR SYSTEM

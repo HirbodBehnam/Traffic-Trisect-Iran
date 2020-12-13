@@ -10,8 +10,8 @@
 XFSS="YOUR_TOKEN"
 #ALSO MAKE SURE THAT CURL, RAR, AWK and JQ ARE INSTALLED ON YOUR SYSTEM
 #Check arguments
-if [[ "$#" -lt 1 ]]; then
-	echo "Please pass file names as argument."
+if [[ "$#" -lt 2 ]]; then
+	echo "Please pass the upload rar name as first argument and file names you want to upload as next arguments."
 	exit 1
 fi
 #This line tries to automatically log you in. Remove this line if you have used static XFSS above
