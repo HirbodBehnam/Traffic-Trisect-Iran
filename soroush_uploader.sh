@@ -2,8 +2,8 @@
 #EDIT TOKEN:
 TOKEN="YOUR_TOKEN"
 if [[ "$#" -lt 1 ]]; then #Check number of arguemnt
-    echo "Please pass file names as argument."
-    exit 1
+	echo "Please pass file names as argument."
+	exit 1
 fi
 #ALSO MAKE SURE THAT CURL, RAR and JQ ARE INSTALLED ON YOUR SYSTEM
 upload() {
@@ -22,17 +22,17 @@ upload() {
 	local fname
 	fname=$(basename "$1")
 	echo "bot.sapp.ir/$TOKEN/downloadFile/$id:$fname" >>"file_names.txt"
-	echo "IDMan.exe /d https://bot.sapp.ir/$TOKEN/downloadFile/$id /f $fname /a" >> idm.bat
+	echo "IDMan.exe /d https://bot.sapp.ir/$TOKEN/downloadFile/$id /f $fname /a" >>idm.bat
 	rm "$1"
 }
 #Lets start
 rm -rf /tmp/SoroushUploader
 #At first rar the file and split it into a temp directory
 mkdir /tmp/SoroushUploader
-rarCommand="rar a -M0 -v100M /tmp/SoroushUploader/u.rar" # You can also change the chunk size. Max upload size is 100MB
-for arg in "$@"
-do
-    rarCommand+=" \"$arg\""
+rarCommand="rar a -M0 -v100M /tmp/SoroushUploader/$1.rar" # You can also change the chunk size. Max upload size is 100MB
+shift
+for arg in "$@"; do
+	rarCommand+=" \"$arg\""
 done
 eval "$rarCommand" #Rar the files
 #Then get the file names and upload eachone to server

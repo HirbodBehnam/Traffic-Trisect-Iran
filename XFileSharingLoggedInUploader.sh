@@ -11,8 +11,8 @@ XFSS="YOUR_TOKEN"
 #ALSO MAKE SURE THAT CURL, RAR, AWK and JQ ARE INSTALLED ON YOUR SYSTEM
 #Check arguments
 if [[ "$#" -lt 1 ]]; then
-    echo "Please pass file names as argument."
-    exit 1
+	echo "Please pass file names as argument."
+	exit 1
 fi
 #This line tries to automatically log you in. Remove this line if you have used static XFSS above
 XFSS=$(curl -c - -F op=login -F token=8e2f556adec156926f42f6cc40fbf238 -F rand="" -F login="your_username" -F password="your_password" http://uplod.ir/ | awk '/xfss/ {print $NF}')
@@ -20,25 +20,25 @@ XFSS=$(curl -c - -F op=login -F token=8e2f556adec156926f42f6cc40fbf238 -F rand="
 rm -rf /tmp/XFSUploader
 mkdir /tmp/XFSUploader
 #Generate the rar command
-rarCommand="rar a -M0 -v1G /tmp/XFSUploader/upload.rar" # You can and might change the file size
-for arg in "$@"
-do
-    rarCommand+=" \"$arg\""
+rarCommand="rar a -M0 -v1G /tmp/XFSUploader/$1.rar" # You can and might change the file size
+shift
+for arg in "$@"; do
+	rarCommand+=" \"$arg\""
 done
 #rar the files
 eval "$rarCommand"
 #Upload each file
 for filename in /tmp/XFSUploader/*.rar; do
-    echo "$(tput setaf 2)Uploading file: $filename $(tput sgr 0)"
-    res=$(curl -F file=@"$filename" -F sess_id="$XFSS" -F utype=reg -b xfss="$XFSS" "http://s6.uplod.ir/cgi-bin/upload.cgi?upload_type=file&utype=reg") # You can change the url. Use inspect element on main form of upload to find the url
-    result=$(jq -r .[0].file_status <<<"$res")
-    if [[ $result != "OK" ]] ; then
-        echo "$(tput setaf 1)Error on uploading file $filename : $res $(tput sgr 0)"
-        continue
-    fi
-    token=$(jq -r .[0].file_code <<<"$res")
-    base=$(basename "$filename")
-    echo "/$base/$token" >> links.txt
-    rm "$filename" #Remove the file if it is uploaded
+	echo "$(tput setaf 2)Uploading file: $filename $(tput sgr 0)"
+	res=$(curl -F file=@"$filename" -F sess_id="$XFSS" -F utype=reg -b xfss="$XFSS" "http://s6.uplod.ir/cgi-bin/upload.cgi?upload_type=file&utype=reg") # You can change the url. Use inspect element on main form of upload to find the url
+	result=$(jq -r .[0].file_status <<<"$res")
+	if [[ $result != "OK" ]]; then
+		echo "$(tput setaf 1)Error on uploading file $filename : $res $(tput sgr 0)"
+		continue
+	fi
+	token=$(jq -r .[0].file_code <<<"$res")
+	base=$(basename "$filename")
+	echo "/$base/$token" >>links.txt
+	rm "$filename" #Remove the file if it is uploaded
 done
 echo "$(tput setaf 2)Done$(tput sgr 0)"
