@@ -20,7 +20,8 @@ XFSS=$(curl -c - -F op=login -F token=8e2f556adec156926f42f6cc40fbf238 -F rand="
 rm -rf /tmp/XFSUploader
 mkdir /tmp/XFSUploader
 #Generate the rar command
-rarCommand="rar a -M0 -v1G /tmp/XFSUploader/$1.rar" # You can and might change the file size
+resultName="$1"
+rarCommand="rar a -M0 -v1G /tmp/XFSUploader/$resultName.rar" # You can and might change the file size
 shift
 for arg in "$@"; do
 	rarCommand+=" \"$arg\""
@@ -38,7 +39,7 @@ for filename in /tmp/XFSUploader/*.rar; do
 	fi
 	token=$(jq -r .[0].file_code <<<"$res")
 	base=$(basename "$filename")
-	echo "/$base/$token" >>links.txt
+	echo "/$base/$token" >> "$resultName.txt"
 	rm "$filename" #Remove the file if it is uploaded
 done
 echo "$(tput setaf 2)Done$(tput sgr 0)"

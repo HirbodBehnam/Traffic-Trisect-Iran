@@ -12,7 +12,8 @@ fi
 rm -rf /tmp/XFSUploader
 mkdir /tmp/XFSUploader
 #Generate the rar command
-rarCommand="rar a -M0 -v1G /tmp/XFSUploader/$1.rar" # You can and might change the file size
+resultName="$1"
+rarCommand="rar a -M0 -v1G /tmp/XFSUploader/$resultName.rar" # You can and might change the file size
 shift
 for arg in "$@"; do
 	rarCommand+=" \"$arg\""
@@ -30,7 +31,7 @@ for filename in /tmp/XFSUploader/*.rar; do
 	fi
 	token=$(jq -r .[0].file_code <<<"$res")
 	base=$(basename "$filename")
-	echo "$URL_BASE/$base/$token" >>links.txt
+	echo "$URL_BASE/$base/$token" >> "$resultName.txt"
 	rm "$filename" #Remove the file if it is uploaded
 done
 echo "$(tput setaf 2)Done$(tput sgr 0)"

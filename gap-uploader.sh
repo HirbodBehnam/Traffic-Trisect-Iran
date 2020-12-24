@@ -11,7 +11,8 @@ fi
 rm -rf /tmp/GapUploader
 mkdir /tmp/GapUploader
 #Generate the rar command
-rarCommand="rar a -M0 -v500M /tmp/GapUploader/$1.rar" #You can change this command
+resultName="$1"
+rarCommand="rar a -M0 -v500M /tmp/GapUploader/$resultName.rar" #You can change this command
 shift
 for arg in "$@"; do
 	rarCommand+=" \"$arg\""
@@ -28,7 +29,7 @@ for filename in /tmp/GapUploader/*.rar; do
 		continue
 	fi
 	path=$(jq -r .path <<<"${ary[0]}")
-	echo "$path" >>links.txt #Save the link
-	rm "$filename"           #Remove the file if it is uploaded
+	echo "$path" >> "$resultName.txt" #Save the link
+	rm "$filename" #Remove the file if it is uploaded
 done
 echo "$(tput setaf 2)Done$(tput sgr 0)"
