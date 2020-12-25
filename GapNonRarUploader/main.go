@@ -51,25 +51,33 @@ func Merge() {
 		log.Fatal("Cannot write file:", err.Error())
 	}
 
-	counter := 0
-	for {
-		counter++
-		if _, err := os.Stat(FileName + "." + strconv.Itoa(counter)); os.IsNotExist(err) {
-			break
-		}
-		// read file to destination
-		r, err := os.Open(FileName + "." + strconv.Itoa(counter))
-		if err != nil {
-			log.Println("Cannot open file for reading:", err.Error())
-			break
-		}
+	for counter := 1; ; counter++ {
+		ok := func() bool {
+			if _, err := os.Stat(FileName + "." + strconv.Itoa(counter)); os.IsNotExist(err) {
+				return false
+			}
+			// read file to destination
+			r, err := os.Open(FileName + "." + strconv.Itoa(counter))
+			if err != nil {
+				log.Println("\nCannot open file for reading:", err.Error())
+				return false
+			}
+			fmt.Printf("\rMerging file number %d", counter)
+			defer r.Close()
 
-		_, err = io.Copy(w, r)
-		if err != nil {
-			log.Println("Cannot copy file:", err.Error())
+			_, err = io.Copy(w, r)
+			if err != nil {
+				log.Println("\nCannot copy file:", err.Error())
+				return false
+			}
+			return true
+		}()
+		if !ok {
 			break
 		}
 	}
+
+	w.Close() // no need for defer we always reach here
 }
 
 func Upload() {
@@ -88,7 +96,7 @@ func Upload() {
 	go func() {
 		size, _ := f.Stat()
 		for {
-			fmt.Print("\r" + fmt.Sprintf("%.2f", float32(totalReadBytes)/float32(size.Size())*100) + "%")
+			fmt.Printf("\r%.2f%", float32(totalReadBytes)/float32(size.Size())*100)
 			time.Sleep(time.Second)
 		}
 	}()
