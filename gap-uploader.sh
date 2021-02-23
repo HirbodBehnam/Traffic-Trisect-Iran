@@ -12,7 +12,7 @@ rm -rf /tmp/GapUploader
 mkdir /tmp/GapUploader
 #Generate the rar command
 resultName="$1"
-rarCommand="rar a -M0 -v500M /tmp/GapUploader/$resultName.rar" #You can change this command
+rarCommand="rar a -M0 -v500M /tmp/GapUploader/$resultName.rar --" #You can change this command
 shift
 for arg in "$@"; do
 	rarCommand+=" \"$arg\""

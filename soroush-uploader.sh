@@ -29,7 +29,7 @@ upload() {
 rm -rf /tmp/SoroushUploader
 #At first rar the file and split it into a temp directory
 mkdir /tmp/SoroushUploader
-rarCommand="rar a -M0 -v100M /tmp/SoroushUploader/$1.rar" # You can also change the chunk size. Max upload size is 100MB
+rarCommand="rar a -M0 -v100M /tmp/SoroushUploader/$1.rar --" # You can also change the chunk size. Max upload size is 100MB
 shift
 for arg in "$@"; do
 	rarCommand+=" \"$arg\""
