@@ -1,23 +1,33 @@
 package main
 
 import (
-	"bytes"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 	"time"
 )
 
-const TOKEN = "" // FILL THIS
-const ReadBuffer = 32 * 1024
-const NumberOfParts = 500 * 1000 * 1000 / ReadBuffer // We read the file 32kb at once. Max file size is 500MB. This is the max number of parts for each file
+const Token = "" // FILL THIS
+const MaxUploadSize = 500 * 1000 * 1000
+
+type ReadLengthReporter struct {
+	r         io.Reader
+	totalRead uint64
+}
+
+func (r *ReadLengthReporter) Read(b []byte) (int, error) {
+	l, err := r.r.Read(b)
+	atomic.AddUint64(&r.totalRead, uint64(l))
+	return l, err
+}
 
 var FileName string
 
@@ -85,51 +95,49 @@ func Upload() {
 	if err != nil {
 		log.Fatal("Cannot create link files:", err.Error())
 	}
-	f, err := os.Open(FileName)
+	checksumFile, err := os.Create(FileName + ".md5")
+	if err != nil {
+		log.Fatal("Cannot create checksum file:", err.Error())
+	}
+	source, err := os.Open(FileName)
 	if err != nil {
 		log.Fatal("Cannot read file:", err.Error())
 	}
+	sourceStat, _ := source.Stat()
 
-	partNumber := 0
-	totalReadBytes := 0
+	var client http.Client
+	reportReader := &ReadLengthReporter{
+		r: source,
+	}
+	partNumber := int64(0)
+	checksum := md5.New()
 	// report progress
-	go func() {
-		size, _ := f.Stat()
+	go func(fileSize float64) {
 		for {
-			fmt.Printf("\r%.2f%", float32(totalReadBytes)/float32(size.Size())*100)
+			fmt.Printf("\r%.2f%%", float64(atomic.LoadUint64(&reportReader.totalRead))/fileSize*100)
 			time.Sleep(time.Second)
 		}
-	}()
-	for doneUploading := false; !doneUploading; {
-		partNumber++
+	}(float64(sourceStat.Size()))
+	for totalParts := ceil(sourceStat.Size(), MaxUploadSize); partNumber < totalParts; partNumber++ {
 		r, w := io.Pipe()           // Use pipe to reduce ram usage, and read and write simultaneously
 		m := multipart.NewWriter(w) // post using multipart
-		go func() {                 //Write to pipe https://medium.com/@owlwalks/sending-big-file-with-minimal-memory-in-golang-8f3fc280d2c
+		checksum.Reset()
+		uploadedFilename := FileName + "." + strconv.FormatInt(partNumber, 10)
+		go func() { // Write to pipe https://medium.com/@owlwalks/sending-big-file-with-minimal-memory-in-golang-8f3fc280d2c
 			defer w.Close()
 			defer m.Close()
-			part, err := m.CreateFormFile("file", FileName+"."+strconv.Itoa(partNumber))
+			part, err := m.CreateFormFile("file", uploadedFilename)
 			if err != nil {
 				return
 			}
 			// now read file
-			buffer := make([]byte, ReadBuffer)
-			for i := 0; i < NumberOfParts; i++ { // TODO: LimitReader maybe?
-				count, rError := f.Read(buffer)
-				if rError != nil {
-					if rError == io.EOF {
-						if i == 0 { // this means that the file is already read
-							os.Exit(0)
-						}
-						doneUploading = true
-						break
-					}
-					log.Fatal("Cannot read file:", rError.Error())
-				}
-				totalReadBytes += count
-				_, wError := part.Write(buffer[:count])
-				if wError != nil {
-					break
-				}
+			limitReader := io.LimitReader(source, MaxUploadSize)
+			// Also calculate the checksum while reading
+			writer := io.MultiWriter(part, checksum)
+			// Copy to checksum and output
+			_, err = io.Copy(writer, limitReader)
+			if err != nil {
+				_ = w.CloseWithError(err)
 			}
 		}()
 		// Initialize uploader
@@ -138,41 +146,36 @@ func Upload() {
 			log.Fatal("Initialize uploader:", err.Error())
 		}
 		req.Header.Set("Content-Type", m.FormDataContentType())
-		req.Header.Add("token", TOKEN) // Add the gap token
+		req.Header.Add("token", Token) // Add the gap token
 		// Submit the request
-		var client = &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Fatal("Cannot upload file (client.Do):", err.Error())
 		}
-		if resp.StatusCode != http.StatusOK { //In Gap 403 means invalid token; 500 invalid file type or big file. 405 means that their server is fucked
+		if resp.StatusCode != http.StatusOK { // In Gap 403 means invalid token; 500 invalid file type or big file. 405 means that their server is fucked
 			log.Fatal("HTTP status is not ok. It is:", resp.StatusCode)
 		}
-		body := &bytes.Buffer{}
-		_, err = body.ReadFrom(resp.Body)
-		if err != nil {
-			log.Fatal("Cannot read body:", err.Error())
-		}
-		_ = resp.Body.Close()
-		//Try to deserialize json
-		readBuf, err := ioutil.ReadAll(body)
-		if err != nil {
-			log.Fatal("Cannot read body(ioutil.ReadAll):", err.Error())
-		}
+		// Try to deserialize json
 		var jsonRes map[string]interface{}
-		err = json.Unmarshal(readBuf, &jsonRes)
+		err = json.NewDecoder(resp.Body).Decode(&jsonRes)
+		_ = resp.Body.Close()
 		if err != nil {
 			log.Fatal("Cannot deserialize the web page json:", err.Error())
 		}
-		if finalLink, ok := jsonRes["path"]; ok {
-			_, err = linksFile.WriteString(finalLink.(string) + "\n")
+		if finalLink, ok := jsonRes["path"].(string); ok {
+			_, err = linksFile.WriteString(finalLink + "\n")
 			if err != nil {
 				fmt.Println()
 				fmt.Println("Cannot write link to file. Here is the link:")
-				fmt.Println(finalLink.(string))
+				fmt.Println(finalLink)
 			}
+			_, _ = fmt.Fprintf(checksumFile, "%x %s\n", checksum.Sum(nil), uploadedFilename)
 		} else {
-			log.Fatal("Cannot deserialize the web page json: Cannot find `path` in the json. Json is:\n" + string(readBuf))
+			log.Fatal("Cannot deserialize the web page json: Cannot find `path` in the json.")
 		}
 	}
+}
+
+func ceil(a, b int64) int64 {
+	return (a + b - 1) / b
 }
