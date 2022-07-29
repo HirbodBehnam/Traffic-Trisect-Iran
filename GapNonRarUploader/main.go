@@ -39,7 +39,7 @@ func main() {
 		fmt.Println(filepath.Base(os.Args[0]) + " u/m filename")
 		fmt.Println()
 		fmt.Println("Usage of upload:")
-		fmt.Println(filepath.Base(os.Args[0]) + " u file1 file2")
+		fmt.Println(filepath.Base(os.Args[0]) + " u filename file1 file2")
 		fmt.Println()
 		fmt.Println("Usage of merge:")
 		fmt.Println(filepath.Base(os.Args[0]) + " m file.ext")
