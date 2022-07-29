@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/tar"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -19,17 +21,17 @@ const Token = "" // FILL THIS
 const MaxUploadSize = 500 * 1000 * 1000
 
 type ReadLengthReporter struct {
-	r         io.Reader
-	totalRead uint64
+	r            io.Reader
+	readCallback func(read int)
 }
 
-func (r *ReadLengthReporter) Read(b []byte) (int, error) {
+func (r ReadLengthReporter) Read(b []byte) (int, error) {
 	l, err := r.r.Read(b)
-	atomic.AddUint64(&r.totalRead, uint64(l))
+	if r.readCallback != nil {
+		r.readCallback(l)
+	}
 	return l, err
 }
-
-var FileName string
 
 func main() {
 	if len(os.Args) < 3 {
@@ -37,37 +39,40 @@ func main() {
 		fmt.Println(filepath.Base(os.Args[0]) + " u/m filename")
 		fmt.Println()
 		fmt.Println("Usage of upload:")
-		fmt.Println(filepath.Base(os.Args[0]) + " u file.ext")
+		fmt.Println(filepath.Base(os.Args[0]) + " u file1 file2")
 		fmt.Println()
 		fmt.Println("Usage of merge:")
 		fmt.Println(filepath.Base(os.Args[0]) + " m file.ext")
 		fmt.Println("Please do not include .1 for the file!")
 		os.Exit(2)
 	}
-	FileName = os.Args[2]
 	if os.Args[1] == "u" {
-		Upload()
+		if len(os.Args) < 3 {
+			fmt.Println("Please pass at least one file to upload")
+			os.Exit(2)
+		}
+		Upload(os.Args[2], os.Args[3:])
 	} else if os.Args[1] == "m" {
-		Merge()
+		Merge(os.Args[2])
 	} else {
 		fmt.Println("Invalid mode:", os.Args[1])
 		os.Exit(2)
 	}
 }
 
-func Merge() {
-	w, err := os.Create(FileName)
+func Merge(filename string) {
+	w, err := os.Create(filename)
 	if err != nil {
 		log.Fatal("Cannot write file:", err.Error())
 	}
 
 	for counter := 1; ; counter++ {
 		ok := func() bool {
-			if _, err := os.Stat(FileName + "." + strconv.Itoa(counter)); os.IsNotExist(err) {
+			if _, err := os.Stat(filename + "." + strconv.Itoa(counter)); os.IsNotExist(err) {
 				return false
 			}
 			// read file to destination
-			r, err := os.Open(FileName + "." + strconv.Itoa(counter))
+			r, err := os.Open(filename + "." + strconv.Itoa(counter))
 			if err != nil {
 				log.Println("\nCannot open file for reading:", err.Error())
 				return false
@@ -90,40 +95,60 @@ func Merge() {
 	w.Close() // no need for defer we always reach here
 }
 
-func Upload() {
-	linksFile, err := os.Create(FileName + ".txt")
+func Upload(filename string, files []string) {
+	// Create a pipe to send data from tar to output
+	tarPipeReader, tarPipeWriter := io.Pipe()
+	totalRead := new(int64)
+	done := new(uint32)
+	tarWriter := tar.NewWriter(tarPipeWriter)
+	// Get total file size
+	totalFileSizes := getFileSizes(files)
+	// Report progress
+	go func(fileSize float64) {
+		for {
+			fmt.Printf("\r%.2f%%", float64(atomic.LoadInt64(totalRead))/fileSize*100)
+			time.Sleep(time.Second)
+		}
+	}(float64(totalFileSizes))
+	// Create the tar files
+	go func() {
+		for _, file := range files {
+			tarFile(tarWriter, file, totalRead)
+		}
+		atomic.StoreUint32(done, 1)
+		tarWriter.Close()
+		tarPipeWriter.Close()
+	}()
+	// Upload the tar stream
+	uploadStream(tarPipeReader, filename, done)
+}
+
+func uploadStream(stream io.Reader, filename string, done *uint32) {
+	// Create the link and checksum files
+	linksFile, err := os.Create(filename + ".txt")
 	if err != nil {
 		log.Fatal("Cannot create link files:", err.Error())
 	}
-	checksumFile, err := os.Create(FileName + ".md5")
+	defer linksFile.Close()
+	checksumFile, err := os.Create(filename + ".md5")
 	if err != nil {
 		log.Fatal("Cannot create checksum file:", err.Error())
 	}
-	source, err := os.Open(FileName)
-	if err != nil {
-		log.Fatal("Cannot read file:", err.Error())
-	}
-	sourceStat, _ := source.Stat()
-
+	defer checksumFile.Close()
+	// Some variables
 	var client http.Client
-	reportReader := &ReadLengthReporter{
-		r: source,
-	}
-	partNumber := int64(0)
+	var partNumber int64
 	checksum := md5.New()
-	// report progress
-	go func(fileSize float64) {
-		for {
-			fmt.Printf("\r%.2f%%", float64(atomic.LoadUint64(&reportReader.totalRead))/fileSize*100)
-			time.Sleep(time.Second)
-		}
-	}(float64(sourceStat.Size()))
-	for totalParts := ceil(sourceStat.Size(), MaxUploadSize); partNumber < totalParts; partNumber++ {
+	// Read until we reach the end of stream
+	for atomic.LoadUint32(done) == 0 {
+		wg := new(sync.WaitGroup)   // The goroutine below must exit before we can check for done
 		r, w := io.Pipe()           // Use pipe to reduce ram usage, and read and write simultaneously
 		m := multipart.NewWriter(w) // post using multipart
-		checksum.Reset()
-		uploadedFilename := FileName + "." + strconv.FormatInt(partNumber, 10)
+		checksum.Reset()            // Use the same summer
+		uploadedFilename := filename + ".tar." + strconv.FormatInt(partNumber, 10)
+		wg.Add(1)
 		go func() { // Write to pipe https://medium.com/@owlwalks/sending-big-file-with-minimal-memory-in-golang-8f3fc280d2c
+			defer wg.Done()
 			defer w.Close()
 			defer m.Close()
 			part, err := m.CreateFormFile("file", uploadedFilename)
@@ -131,13 +156,13 @@ func Upload() {
 				return
 			}
 			// now read file
-			limitReader := io.LimitReader(source, MaxUploadSize)
+			limitReader := io.LimitReader(stream, MaxUploadSize)
 			// Also calculate the checksum while reading
 			writer := io.MultiWriter(part, checksum)
 			// Copy to checksum and output
 			_, err = io.Copy(writer, limitReader)
 			if err != nil {
-				_ = w.CloseWithError(err)
+				w.CloseWithError(err)
 			}
 		}()
 		// Initialize uploader
@@ -165,17 +190,58 @@ func Upload() {
 		if finalLink, ok := jsonRes["path"].(string); ok {
 			_, err = linksFile.WriteString(finalLink + "\n")
 			if err != nil {
-				fmt.Println()
-				fmt.Println("Cannot write link to file. Here is the link:")
-				fmt.Println(finalLink)
+				fmt.Println("\nCannot write link to file. Here is the link:\n" + finalLink)
 			}
 			_, _ = fmt.Fprintf(checksumFile, "%x %s\n", checksum.Sum(nil), uploadedFilename)
 		} else {
 			log.Fatal("Cannot deserialize the web page json: Cannot find `path` in the json.")
 		}
+		// Wait for upload goroutine
+		wg.Wait()
 	}
 }
 
-func ceil(a, b int64) int64 {
-	return (a + b - 1) / b
+func tarFile(w *tar.Writer, filename string, totalRead *int64) {
+	// Open the file
+	file, err := os.Open(filename)
+	if err != nil {
+		fmt.Println("\nCannot open file ", filename, ":", err)
+		return
+	}
+	// Create the file in tar
+	stat, _ := file.Stat()
+	err = w.WriteHeader(&tar.Header{
+		Name: filename,
+		Size: stat.Size(),
+	})
+	if err != nil {
+		fmt.Println("\nCannot write the tar header:", err)
+		return
+	}
+	// Create the reader
+	reportReader := &ReadLengthReporter{
+		r: file,
+		readCallback: func(read int) {
+			atomic.AddInt64(totalRead, int64(read))
+		},
+	}
+	// Copy
+	_, err = io.Copy(w, reportReader)
+	if err != nil {
+		fmt.Println("\nCannot create the tar:", err)
+		return
+	}
+}
+
+func getFileSizes(files []string) int64 {
+	var totalSize int64
+	for _, file := range files {
+		stat, err := os.Stat(file)
+		if err != nil {
+			fmt.Println("Cannot open file ", file, ":", err)
+			continue
+		}
+		totalSize += stat.Size()
+	}
+	return totalSize
 }
