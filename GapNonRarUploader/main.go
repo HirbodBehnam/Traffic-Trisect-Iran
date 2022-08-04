@@ -141,6 +141,7 @@ func uploadStream(stream io.Reader, filename string, done *uint32) {
 	checksum := md5.New()
 	// Read until we reach the end of stream
 	for atomic.LoadUint32(done) == 0 {
+		partNumber++
 		wg := new(sync.WaitGroup)   // The goroutine below must exit before we can check for done
 		r, w := io.Pipe()           // Use pipe to reduce ram usage, and read and write simultaneously
 		m := multipart.NewWriter(w) // post using multipart
