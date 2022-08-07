@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -39,7 +40,7 @@ func main() {
 		fmt.Println(filepath.Base(os.Args[0]) + " u/m filename")
 		fmt.Println()
 		fmt.Println("Usage of upload:")
-		fmt.Println(filepath.Base(os.Args[0]) + " u filename file1 file2")
+		fmt.Println(filepath.Base(os.Args[0]) + " u [--parts 1,4,6,8-10] filename file1 file2")
 		fmt.Println()
 		fmt.Println("Usage of merge:")
 		fmt.Println(filepath.Base(os.Args[0]) + " m file.ext")
@@ -47,11 +48,23 @@ func main() {
 		os.Exit(2)
 	}
 	if os.Args[1] == "u" {
+		// Check --parts
 		if len(os.Args) < 3 {
 			fmt.Println("Please pass at least one file to upload")
 			os.Exit(2)
 		}
-		Upload(os.Args[2], os.Args[3:])
+		// Check parts
+		var parts map[int64]struct{}
+		if os.Args[2] == "--parts" {
+			if len(os.Args) < 5 {
+				fmt.Println("Please pass at least one file to upload")
+				os.Exit(2)
+			}
+			parts = parseParts(os.Args[3])
+			Upload(os.Args[4], os.Args[5:], parts)
+		} else {
+			Upload(os.Args[2], os.Args[3:], parts)
+		}
 	} else if os.Args[1] == "m" {
 		Merge(os.Args[2])
 	} else {
@@ -95,7 +108,7 @@ func Merge(filename string) {
 	w.Close() // no need for defer we always reach here
 }
 
-func Upload(filename string, files []string) {
+func Upload(filename string, files []string, parts map[int64]struct{}) {
 	// Create a pipe to send data from tar to output
 	tarPipeReader, tarPipeWriter := io.Pipe()
 	totalRead := new(int64)
@@ -120,10 +133,10 @@ func Upload(filename string, files []string) {
 		tarPipeWriter.Close()
 	}()
 	// Upload the tar stream
-	uploadStream(tarPipeReader, filename, done)
+	uploadStream(tarPipeReader, filename, done, parts)
 }
 
-func uploadStream(stream io.Reader, filename string, done *uint32) {
+func uploadStream(stream io.Reader, filename string, done *uint32, parts map[int64]struct{}) {
 	// Create the link and checksum files
 	linksFile, err := os.Create(filename + ".txt")
 	if err != nil {
@@ -142,6 +155,13 @@ func uploadStream(stream io.Reader, filename string, done *uint32) {
 	// Read until we reach the end of stream
 	for atomic.LoadUint32(done) == 0 {
 		partNumber++
+		// Check if we don't need this part
+		if _, exists := parts[partNumber]; !exists && len(parts) != 0 {
+			// Just discard the input
+			fmt.Println("\nSkipping part ", partNumber)
+			io.Copy(io.Discard, io.LimitReader(stream, MaxUploadSize))
+			continue
+		}
 		wg := new(sync.WaitGroup)   // The goroutine below must exit before we can check for done
 		r, w := io.Pipe()           // Use pipe to reduce ram usage, and read and write simultaneously
 		m := multipart.NewWriter(w) // post using multipart
@@ -245,4 +265,35 @@ func getFileSizes(files []string) int64 {
 		totalSize += stat.Size()
 	}
 	return totalSize
+}
+
+func parseParts(argument string) map[int64]struct{} {
+	splitData := strings.Split(argument, ",")
+	result := make(map[int64]struct{}, len(splitData))
+	for _, data := range splitData {
+		if strings.Contains(data, "-") { // Range
+			ranges := strings.Split(argument, "-")
+			start, err := strconv.ParseInt(ranges[0], 10, 64)
+			if err != nil {
+				fmt.Printf("Invalid number on start of range %s: %s", data, err)
+				continue
+			}
+			end, err := strconv.ParseInt(ranges[1], 10, 64)
+			if err != nil {
+				fmt.Printf("Invalid number on end of range %s: %s", data, err)
+				continue
+			}
+			for ; start <= end; start++ {
+				result[start] = struct{}{}
+			}
+		} else { // Number
+			part, err := strconv.ParseInt(data, 10, 64)
+			if err != nil {
+				fmt.Printf("Invalid number on parts argument %s: %s", data, err)
+				continue
+			}
+			result[part] = struct{}{}
+		}
+	}
+	return result
 }
