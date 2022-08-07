@@ -49,14 +49,14 @@ func main() {
 	}
 	if os.Args[1] == "u" {
 		// Check --parts
-		if len(os.Args) < 3 {
+		if len(os.Args) < 4 {
 			fmt.Println("Please pass at least one file to upload")
 			os.Exit(2)
 		}
 		// Check parts
 		var parts map[int64]struct{}
 		if os.Args[2] == "--parts" {
-			if len(os.Args) < 5 {
+			if len(os.Args) < 6 {
 				fmt.Println("Please pass at least one file to upload")
 				os.Exit(2)
 			}
@@ -158,10 +158,11 @@ func uploadStream(stream io.Reader, filename string, done *uint32, parts map[int
 		// Check if we don't need this part
 		if _, exists := parts[partNumber]; !exists && len(parts) != 0 {
 			// Just discard the input
-			fmt.Println("\nSkipping part ", partNumber)
+			fmt.Println("\nSkipping part", partNumber)
 			io.Copy(io.Discard, io.LimitReader(stream, MaxUploadSize))
 			continue
 		}
+		fmt.Println("\nUploading part", partNumber)
 		wg := new(sync.WaitGroup)   // The goroutine below must exit before we can check for done
 		r, w := io.Pipe()           // Use pipe to reduce ram usage, and read and write simultaneously
 		m := multipart.NewWriter(w) // post using multipart
