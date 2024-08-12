@@ -1,22 +1,10 @@
 #!/bin/bash
 PFAU="" # TODO: FILL ME!
 # Check the arguments
-if [[ "$#" -lt 2 ]]; then
-	echo "Please pass the upload rar name as first argument and file names you want to upload as next arguments." >&2
+if [[ "$#" -lt 1 ]]; then
+	echo "Please pass the file names you want to upload as arguments." >&2
 	exit 1
 fi
-# Remove old files if left and create new one
-rm -rf /tmp/PicoUploader
-mkdir /tmp/PicoUploader
-# Generate the rar command
-resultName="$1"
-rarCommand="rar a -M0 -v500M /tmp/PicoUploader/$resultName.rar --" # you can change this command
-shift
-for arg in "$@"; do
-	rarCommand+=" \"$arg\""
-done
-# rar the files
-eval "$rarCommand"
 # Get the stuff needed from picofile
 PANEL=$(curl -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0' --cookie ".pfau=$PFAU" https://www.picofile.com/panel)
 GUID_REGEX='var guid = "([a-z0-9\-]+)"'
@@ -40,7 +28,7 @@ fi
 echo "Logged in as $USERNAME_REGEX. Uploading to server $UPLOADSERVER_REGEX"
 # Upload each file
 FILE_NUMBER=1
-for filename in /tmp/PicoUploader/*.rar; do
+for filename in "$@"; do
 	echo "$(tput setaf 2)Uploading file: $filename $(tput sgr 0)"
 	rng=$((1 + RANDOM % 10000))
 	res=$(curl --write-out "\n%{http_code}" -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0' --cookie ".pfau=$PFAU" -F folderid=0 -F filename="$filename" -F upload=@"$filename" "https://$UPLOADSERVER.picofile.com/file/upload$GUID$rng?uploadkey=${GUID}_$FILE_NUMBER&username=$USERNAME")
@@ -52,6 +40,6 @@ for filename in /tmp/PicoUploader/*.rar; do
 	rm "$filename" # remove the file if it is uploaded
 	# Get the link of the file
 	rng=$((1 + RANDOM % 10000))
-	curl -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0' --cookie ".pfau=$PFAU" "https://$UPLOADSERVER.picofile.com/file/fileuploadinfo$GUID$rng?uploadkey=${GUID}_$FILE_NUMBER&username=$USERNAME&0.1234" | jq '"https://" + .server + ".picofile.com/file/" + (.fileId | tostring) + "/" + .name + ".html"' >> "$resultName.txt"
+	curl -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0' --cookie ".pfau=$PFAU" "https://$UPLOADSERVER.picofile.com/file/fileuploadinfo$GUID$rng?uploadkey=${GUID}_$FILE_NUMBER&username=$USERNAME&0.1234" | jq '"https://" + .server + ".picofile.com/file/" + (.fileId | tostring) + "/" + .name + ".html"' >> "links.txt"
 	FILE_NUMBER=$((FILE_NUMBER+1))
 done
