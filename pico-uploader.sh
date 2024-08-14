@@ -24,20 +24,23 @@ if [[ $PANEL =~ $GUID_REGEX ]]; then
 	GUID="${BASH_REMATCH[1]}"
 else
 	echo "Cannot get GUID" >&2
+	exit 1
 fi
 USERNAME_REGEX='var username = "([A-Za-z0-9\-_]+)"'
 if [[ $PANEL =~ $USERNAME_REGEX ]]; then
 	USERNAME="${BASH_REMATCH[1]}"
 else
 	echo "Cannot get username" >&2
+	exit 1
 fi
 UPLOADSERVER_REGEX='var uploadServers = "([A-Za-z0-9\-]+)"'
 if [[ $PANEL =~ $UPLOADSERVER_REGEX ]]; then
 	UPLOADSERVER="${BASH_REMATCH[1]}"
 else
 	echo "Cannot get uploadserver" >&2
+	exit 1
 fi
-echo "Logged in as $USERNAME_REGEX. Uploading to server $UPLOADSERVER_REGEX"
+echo "Logged in as $USERNAME. Uploading to server $UPLOADSERVER"
 # Upload each file
 FILE_NUMBER=1
 for filename in /tmp/PicoUploader/*.rar; do
@@ -52,6 +55,6 @@ for filename in /tmp/PicoUploader/*.rar; do
 	rm "$filename" # remove the file if it is uploaded
 	# Get the link of the file
 	rng=$((1 + RANDOM % 10000))
-	curl -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0' --cookie ".pfau=$PFAU" "https://$UPLOADSERVER.picofile.com/file/fileuploadinfo$GUID$rng?uploadkey=${GUID}_$FILE_NUMBER&username=$USERNAME&0.1234" | jq '"https://" + .server + ".picofile.com/file/" + (.fileId | tostring) + "/" + .name + ".html"' >> "$resultName.txt"
+	curl -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0' --cookie ".pfau=$PFAU" "https://$UPLOADSERVER.picofile.com/file/fileuploadinfo$GUID$rng?uploadkey=${GUID}_$FILE_NUMBER&username=$USERNAME&0.1234" | jq -r '"https://" + .server + ".picofile.com/file/" + (.fileId | tostring) + "/" + .name + ".html"' >> "$resultName.txt"
 	FILE_NUMBER=$((FILE_NUMBER+1))
 done
