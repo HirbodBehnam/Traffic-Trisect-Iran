@@ -1,6 +1,6 @@
 #!/bin/bash
-FILE_ID_REGEX="/view/([0-9a-zA-Z_.]+)"
-FILE_URL_REGEX="(https://s6.uupload.ir/filelink/[0-9a-zA-Z_.]+/[0-9a-zA-Z_.]+)"
+FILE_ID_REGEX='/view/([0-9a-zA-Z_.\-]+)'
+FILE_URL_REGEX='(https://s6.uupload.ir/filelink/[0-9a-zA-Z_.\-]+/[0-9a-zA-Z_.\-]+)'
 while IFS= read -r link; do
     echo "$1 $link"
     if [[ $link =~ $FILE_ID_REGEX ]]; then
