@@ -22,6 +22,7 @@ RUN apt install -y \
   curl \
   wget \
   chromium \
+  chromium-driver \
   python3 \
   python3-pip \
   python3-full \

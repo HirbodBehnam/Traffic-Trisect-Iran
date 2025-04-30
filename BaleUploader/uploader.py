@@ -35,9 +35,15 @@ for file in sys.argv[1:]:
         print("Cannot open file", file, ":", e)
         exit(1)
 
+service = webdriver.ChromeService(executable_path="/usr/bin/chromedriver")
 options = webdriver.ChromeOptions()
+options.add_argument("start-maximized")
+options.add_argument("enable-automation")
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--user-data-dir=./userdata/")
-with webdriver.Chrome(options=options) as driver:
+options.binary_location = "/usr/bin/chromium"
+with webdriver.Chrome(options=options, service=service) as driver:
     # Load the page
     driver.get("https://web.bale.ai")
     time.sleep(5)
