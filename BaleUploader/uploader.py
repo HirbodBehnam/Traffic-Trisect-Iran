@@ -57,7 +57,7 @@ with webdriver.Chrome(options=options, service=service) as driver:
     for file in sys.argv[1:]:
         dropzones = driver.find_elements(By.CLASS_NAME, "main-section-container")
         print("Drop zone candidates:", len(dropzones))
-        drop_files(dropzones[0], file)
+        drop_files(dropzones[0], os.path.abspath(file))
         time.sleep(5)
         # Click on confirm
         send_button = driver.find_elements(By.XPATH, "//button[contains(text(), 'ارسال')]")
