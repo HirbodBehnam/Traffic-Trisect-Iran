@@ -43,8 +43,6 @@ RUN echo 'hirbod:123456' | chpasswd
 USER hirbod
 ENV USER=hirbod
 
-COPY uploader.py /home/hirbod/uploader.py
-
 # VNC and noVNC config
 ARG VNCPORT=5900
 ENV VNCPORT=${VNCPORT}
@@ -72,6 +70,9 @@ export XKL_XMODMAP_DISABLE=1 \n\
 startxfce4 & \n\
 " > $HOME/.vnc/xstartup
 RUN chmod +x $HOME/.vnc/xstartup
+
+COPY uploader.py /home/hirbod/uploader.py
+COPY DownloadGrabber/ /home/hirbod/DownloadGrabber/
 
 ENTRYPOINT [ "/bin/bash", "-c", " \
   vncserver :0 -rfbport ${VNCPORT} -geometry $VNCDISPLAY -depth $VNCDEPTH; \

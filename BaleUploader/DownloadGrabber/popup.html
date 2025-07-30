@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      width: 350px;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .status {
+      background: #f0f0f0;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    
+    .links-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin-bottom: 15px;
+      background: #fafafa;
+    }
+    
+    .link-item {
+      margin-bottom: 8px;
+      font-size: 12px;
+      word-break: break-all;
+    }
+    
+    .buttons {
+      display: flex;
+      gap: 10px;
+    }
+    
+    button {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .export-btn {
+      background: #4CAF50;
+      color: white;
+    }
+    
+    .clear-btn {
+      background: #f44336;
+      color: white;
+    }
+    
+    button:hover {
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h3>Download Link Capturer</h3>
+  </div>
+  
+  <div class="status">
+    <div id="statusText">Loading...</div>
+  </div>
+  
+  <div class="links-list" id="linksList">
+    <div>No links captured yet</div>
+  </div>
+  
+  <div class="buttons">
+    <button class="export-btn" id="exportBtn">Export to File</button>
+    <button class="clear-btn" id="clearBtn">Clear List</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

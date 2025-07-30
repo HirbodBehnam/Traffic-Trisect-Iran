@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Download Link Capturer",
+  "version": "1.0",
+  "description": "Captures download links and saves them to a file",
+  "permissions": [
+    "downloads",
+    "downloads.shelf"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Download Link Capturer"
+  }
+}

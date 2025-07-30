@@ -28,7 +28,7 @@ if len(sys.argv) <= 1:
     exit(1)
 for file in sys.argv[1:]:
     try:
-        if os.path.getsize(file) > 500_000_000:
+        if os.path.getsize(file) > 500 * 1024 * 1024:
             print("File", file, "is too large")
             exit(1)
     except Exception as e:
@@ -40,7 +40,6 @@ options = webdriver.ChromeOptions()
 options.add_argument("start-maximized")
 options.add_argument("enable-automation")
 options.add_argument("--no-sandbox")
-options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--user-data-dir=./userdata/")
 options.binary_location = "/usr/bin/chromium"
 with webdriver.Chrome(options=options, service=service) as driver:
@@ -67,4 +66,6 @@ with webdriver.Chrome(options=options, service=service) as driver:
         # Wait for upload
         time.sleep(50)
 
-print("File upload done!")
+    print("File upload done!")
+    print("Press enter to exit the browser")
+    input()
